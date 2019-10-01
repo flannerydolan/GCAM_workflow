@@ -4,7 +4,7 @@ Code used to run and process 3000 GCAM scenarios
 
 1. Make sure GCAM runs without errors using a specific broyden config file.
 2. Make the file structure necessary for the config files. An example path is config_files/ssp_soc/ssp_socio1/ag1/ 
-Alternatively, config_files/ssp_ag/ag1/ssp_socio1  and do this for all ssps 1-5. You should have 50 folders by the end.
+Alternatively, config_files/ssp_ag/ssp_ag1/soc1/and do this for all ssps 1-5. You should have 50 folders by the end.
 3. Use WriteConfigFiles.ipynb (after changing paths of xml files) to write configuration files. 
 4. Use job arrays per folder (see gcam-array_ag5soc5.sh for example) to run the 60 scenarios in each folder. NOTE: yes, this means you run 50 job arrays which may seem inefficient, but that makes it easier to see where errors occur and to fix said errors.
 5. After all runs have completed successfully, move the runs from the hierarchical file structure into a single FINAL folder (this can be done quickly with a recursive mv)
