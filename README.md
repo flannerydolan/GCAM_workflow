@@ -16,3 +16,5 @@ Alternatively, config_files/ssp_ag/ag1/ssp_socio1  and do this for all ssps 1-5.
 10. To run all the unlimited scenarios, use the same methodology except without the groundwater, reservoir storage, and ESM forcing dimensions. I did this in a single job array (unlimited_water_array.sh) after making the config files.
 11. Query the data using water_withdrawals_basin_unlimited.R and submit the job with water_withdrawals_basin_unlimited.sh. 
 12. The post processing will be the same except for the missing dimensions. 
+
+13. To run CART on the data, use the cart.R script
