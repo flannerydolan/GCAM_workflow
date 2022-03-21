@@ -1,0 +1,262 @@
+# GCAM 5.4 Installation Guide
+# Written and tested on February 8, 2022 by Jake Wessel
+# with help from Delilah Maloney, Flannery Dolan, Abby Birnbaum
+# official GCAM build guide: http://jgcri.github.io/gcam-doc/gcam-build.html
+# see also PowerPoint from https://github.com/JGCRI/gcam-core/releases/tag/gcam-v5.4
+# GCAM user guide (plus model interface): https://jgcri.github.io/gcam-doc/user-guide
+# Other resources: https://rstudio-pubs-static.s3.amazonaws.com/411318_37131d29d5914efa8ea8fde022d3dfac.html
+
+# First, if you do not have cluster access, request it following instructions at https://access.tufts.edu/research-cluster-account
+# Login to cluster using any command line (my username is jwesse03, replace with your own wherever you see it)
+ssh <username>@login.pax.tufts.edu
+# Enter password and 2FA option
+# I use and recommend PuTTY for cluster access, which you can set to automatically connect to the cluster without typing the ssh every time
+
+# Once you log into the cluster, navigate to your space:
+cd cluster/tufts/lamontagnelab/jwesse03
+
+# Optional: create a folder called GCAM to keep everything organized
+mkdir GCAM
+cd GCAM
+# Wherever you see cluster/tufts/lamontagnelab/jwesse03/GCAM/ you will need to replace it with your own username and desired path
+
+# Create folder for libraries and allocate memory. Note: jobs and commands will be terminated if you run something substantial from a login node.
+mkdir libs
+srun -p llab --mem=32g --time=8:00:00 -n 8 --pty bash
+# If you log out and back in over the course of completing this install, you may need to re-allocate memory.
+
+### Option 1: If you are building and compiling third-party packages yourself:
+
+# At the time of writing, boost_1_66_0 is the latest version of boost compatible with Hector.
+# Download Boost: boost_1_66_0.tar.gz from https://boostorg.jfrog.io/artifactory/main/release/1.66.0/source/
+# Download Xerces: xerces-c-3.2.3.tar.gz from http://xerces.apache.org/xerces-c/download.cgi
+# Download Eigen: eigen-master.tar.gz from https://gitlab.com/libeigen/eigen/-/archive/master/eigen-master.tar.gz
+# Download Jars: gcam-v5.4-Windows-Release-Package.zip from https://github.com/JGCRI/gcam-core/releases/tag/gcam-v5.4
+# Note: You only need the 'jars' folder within 'libs' in the gcam-v5.4-Windows-Release-Package.
+# So, unzip gcam-v5.4-Windows-Release-Package.zip locally and recompress only the jars folder into jars.zip to move to the cluster
+
+# Use WinSCP, scp from the command line, or other file transfer method to move the downloaded files into your GCAM folder
+# Unzip files and configure/build packages (some commands could take several minutes to complete)
+# tar -xf <filename> will unzip tar files, use tar -xvf <filename> for verbose output
+
+# Boost:
+tar -xf boost_1_66_0.tar.gz
+# Move unzipped file to libs folder and then cd into the boost folder
+mv boost_1_66_0 libs/
+cd /cluster/tufts/lamontagnelab/jwesse03/GCAM/libs/boost_1_66_0/
+# Commands to build Boost
+./bootstrap.sh --with-libraries=system,filesystem --prefix=/cluster/tufts/lamontagnelab/jwesse03/GCAM/libs/boost_1_66_0/stage/lib
+./b2 stage
+# Get back to main GCAM folder with cd ../../ or cd /cluster/tufts/lamontagnelab/jwesse03/GCAM
+
+# Xerces:
+tar -xf xerces-c-3.2.3.tar.gz
+mkdir libs/xercesc
+cd xerces-c-3.2.3
+./configure --prefix=/cluster/tufts/lamontagnelab/jwesse03/GCAM/libs/xercesc --disable-netaccessor-curl
+make install
+make clean
+# Get back to main GCAM folder with cd ../ or cd /cluster/tufts/lamontagnelab/jwesse03/GCAM
+# Optionally, clean up workspace by moving the xerces-c-3.2.3 directory into libs as well
+mv xerces-c-3.2.3 libs/
+
+# Jars: 
+unzip jars.zip
+mv jars libs/
+# Note: make sure there isn't a nested jars/jars folder as a result of recompressing it initially. Or, just edit the setup file to account for it.
+# Note: the jars folder for earlier versions of GCAM is the same except for the BaseX version, which needs to be at least BaseX-9.5.0.jar (https://basex.org/download/)
+
+# Eigen:
+tar -xf eigen-master.tar.gz
+# Rename to just 'eigen' and move to libs folder
+mv eigen-master libs/eigen
+
+# Remove compressed files to clean up directory
+rm xerces-c-3.2.3.tar.gz
+rm boost_1_66_0.tar.gz
+rm jars.zip
+rm eigen-master.tar.gz
+
+# Clone GCAM from Github (in main GCAM folder)
+module load git
+git clone https://github.com/JGCRI/gcam-core.git
+
+# Compile Hector climate model
+cd /cluster/tufts/lamontagnelab/jwesse03/GCAM/gcam-core
+make install_hector
+
+# Alternatively, if "make install_hector" fails, run the following two lines inside gcam-core directory
+git submodule init cvs/objects/climate/source/hector
+git submodule update cvs/objects/climate/source/hector
+
+# Successfully installing Hector will produce output similar to when you cloned gcam-core from Github. If it doesn't, it may not have worked.
+
+# Create setup file for defining environment variables in main GCAM folder (don't forget to type the >)
+cd ../
+> setup_gcam
+vi setup_gcam
+
+# Enter the following into the file (press i to enable editing once you're in the file)
+# Note: Make sure to update paths to navigate to your workspace, and triple check them if you organized your folders differently
+module purge
+module load java/1.8.0_60 gcc/9.3.0
+module load intel-oneapi-tbb
+export CXX=g++
+export BOOST_INCLUDE=/cluster/tufts/lamontagnelab/jwesse03/GCAM/libs/boost_1_66_0
+export BOOST_LIB=/cluster/tufts/lamontagnelab/jwesse03/GCAM/libs/boost_1_66_0/stage/lib
+export XERCES_INCLUDE=/cluster/tufts/lamontagnelab/jwesse03/GCAM/libs/xercesc/include
+export XERCES_LIB=/cluster/tufts/lamontagnelab/jwesse03/GCAM/libs/xercesc/lib
+export JARS_LIB=/cluster/tufts/lamontagnelab/jwesse03/GCAM/libs/jars/*
+export JAVA_INCLUDE=${JAVA_HOME}/include
+export JAVA_LIB=${JAVA_HOME}/jre/lib/amd64/server
+export CPATH=$CPATH:/cluster/tufts/lamontagnelab/jwesse03/GCAM/libs/xercesc/include
+export EIGEN_INCLUDE=/cluster/tufts/lamontagnelab/jwesse03/GCAM/libs/eigen
+
+# Press escape when finished, then type :wq and hit enter to save and exit the file
+# Run setup file
+source setup_gcam
+
+# Build GCAM (errors show up in red)
+cd gcam-core/cvs/objects/build/linux
+make gcam -j 8
+
+### Option 2: If you are using the packages already installed on the cluster:
+
+# Create setup file for defining environment variables in main GCAM folder (don't forget to type the >)
+> setup_gcam
+vi setup_gcam
+
+# Enter the following into the file (press i to enable editing once you're in the file)
+module purge
+module load java/1.8.0_60 gcc/9.3.0
+module load intel-oneapi-tbb eigen/3.4.0
+export CXX=g++
+export BOOST_INCLUDE=/cluster/tufts/hpc/tools/boost/src/boost_1_75_0
+export BOOST_LIB=/cluster/tufts/hpc/tools/boost/src/boost_1_75_0/stage/lib
+export XERCES_INCLUDE=/cluster/tufts/hpc/tools/xerces/4.0.0/include
+export XERCES_LIB=/cluster/tufts/hpc/tools/xerces/4.0.0/lib
+export JARS_LIB=/cluster/tufts/hpc/tools/gcam/5.4/gcam-core/libs/jars/*
+export JAVA_INCLUDE=${JAVA_HOME}/include
+export JAVA_LIB=${JAVA_HOME}/jre/lib/amd64/server
+export CPATH=$CPATH:/cluster/tufts/hpc/tools/xerces/4.0.0/include
+
+# Press escape when finished, then type :wq and hit enter to save and exit the file
+
+# Run setup file
+source setup_gcam
+
+# Build GCAM (errors show up in red)
+cd gcam-core/cvs/objects/build/linux
+make gcam -j 8
+
+### Option 3: If you are using the version of GCAM already on the cluster, run one of the following:
+
+module load gcam/5.3
+module load gcam/5.4
+
+#####################################################################################################
+
+### Running the GCAM reference scenario:
+
+# Part One: Creating the XML files
+
+# Method 1: From Command Line (preferred)
+
+# From your main GCAM folder:
+# Check module av for most recent version of R (4.0.0 in this case)
+
+cd gcam-core/input/gcamdata
+module load R/4.0.0
+R
+
+# Typing just ‘R’ should open an R session. Now link to the installed packages on the cluster:
+
+LIB=‘/cluster/tufts/hpc/tools/R/4.0.0’
+.libPaths(c(“”,LIB))
+.libPaths()
+
+# Now, load in the tools and run the driver() function to generate the xml files (this will take some time)
+# Note: Make sure you aren't still in your login node. If so, run 'srun -p llab --mem=32g --time=8:00:00 -n 8 --pty bash' to allocate resources
+
+devtools::load_all()
+driver(write_outputs = FALSE, write_xml = TRUE)
+
+# Finally, type quit() to exit the R session, then choose whether to save the workspace image with y/n
+# If you are still in the gcamdata folder, check that your xml folder is populated by typing:
+
+ls xml
+
+# Note that these xml files will only work with the version of GCAM that you cloned and have been working with.
+
+
+# Method 2: Using RStudio (this method is more tedious, more time consuming, and may not work. not recommended)*
+# * Currently does not work, getting left_join_no_match errors in RStudio
+
+# You will need R and RStudio to generate the XML input files needed to run GCAM.
+# Download/install R from any mirror: https://cran.r-project.org/mirrors.html
+# Download/install RStudio: https://www.rstudio.com/products/rstudio/download/
+# Note that you will also need Java installed if you don't already have it on your machine (must be 64-bit)
+# gcamdata for GCAM 5.4 will only work with dplyr 1.0.0
+
+# Using WinSCP or another file transfer method, move the entire gcamdata folder from within gcam-core/input to your local machine
+
+# Open RStudio and open gcamdata.Rproj
+# Install required packages by running the following lines
+install.packages(c("devtools", "dplyr", "tidyr", "readr", "testthat", "assertthat", "roxygen2"))
+install.packages("data.table")
+devtools::install_github("krlmlr/mockr")
+
+# In the "Build" tab of the top right panel (default layout), click "Install and Restart" (or "Build and Reload" on earlier versions of RStudio)
+# Finally, type the following into the console to build the data system (will take a while):
+driver(write_output=FALSE,write_xml=TRUE)
+
+# Using WinSCP or another file transfer method, move the xml folder and its contents back to the cluster in the gcam-core/input/gcamdata directory
+
+
+# Part Two: Running GCAM
+
+# Creating configuration file by copying reference configuration file
+# From your main GCAM folder:
+cd gcam-core/exe
+cp configuration_ref.xml configuration.xml
+# Note: this configuration file is for the reference scenario. Changing the configuration file is an important part of running custom scenarios.
+
+# Run GCAM (from the exe folder)
+# Note: If you've restarted your cluster session since beginning the process, you may need to run 'source setup_gcam' again
+# Note: Make sure you aren't still in your login node, may need to run 'srun -p llab --mem=32g --time=8:00:00 -n 8 --pty bash' again
+./gcam.exe
+
+# The model will start by parsing the input files, and will generate a verbose output on the command line of each XML it reads in. If any required XML files are
+# not found, the model will quit and give an error naming that particular file. If that happens, make sure the data system you generate is for the version of
+# GCAM you have installed. For example, the XML files for GCAM 5.3 are not exactly the same ones as in GCAM 5.4, and are therefore not compatible.
+
+# After XML parsing is complete, GCAM will start a new scenario. At this point, I originally was getting a fatal Java pointing to [libboost_filesystem.so.1.78.0+0x168d7],
+# and eventually found that Hector had not installed correctly due to incompatibility with versions of Boost later than 1.66.0. Re-cloning GCAM and installing Hector
+# again after building Boost 1.66.0 solved this issu for me. Later versions of Hector may become compatible without issue.
+
+# GCAM will now start a model run, iterating through each time period and outputting that it solved normally with the number of iterations. At the end, you will hopefully see:
+All model periods solved correctly.
+Model run completed.
+Printing output
+Starting output to XML Database.
+Model run completed.
+Model exiting successfully.
+
+
+#####################################################################################################
+
+### Viewing the Reference Scenario Output using ModelInterface
+
+# Download the GCAM5.4 zipped release package from https://github.com/JGCRI/gcam-core/releases (I am using the Windows) and unzip it.
+# Note: you may still have this release package from before when we extracted the jars folder from it.
+
+# Using WinSCP, transfer the entire gcam-core/output/database_basexdb directory and its contents to your local machine. This is your model output.
+
+# Navigate to gcam-v5.4-Windows-Release-Package/ModelInterface and double-click on 'run-model-interface' (Windows Batch File). This should open a terminal
+# which activates the Model Interface in Java. Your machine will probably need Java to run this properly.
+
+# Click File->Open->DB Open and navigate to your database_basexdb folder. You don't need to go into the folder, just click on it to highlight it and then click Open.
+# Your ModelInterface Java GUI should now be open.
+
+# With your scenario highlighted (there should be only one unless you ran GCAM multiple times), click on a region in the Regions pane and a query in the Queries pane.
+# Click 'Run Query' to see the output in a table and time series plot below.
